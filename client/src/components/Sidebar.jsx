@@ -44,7 +44,7 @@ const Sidebar = () => {
 
     // Read role set during login
     const role = localStorage.getItem('userRole') || 'EMPLOYEE'
-    const navItems = role === 'ADMIN' ? adminNavItems : employeeNavItems
+    const navItems = role === 'EMPLOYEE' ? adminNavItems : employeeNavItems
 
     useEffect(() => {
         setUserName(dummyProfileData.firstName + ' ' + dummyProfileData.lastName)
