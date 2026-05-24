@@ -19,6 +19,8 @@ const LoginForm = ({ role }) => {
         e.preventDefault()
         setError("")
         setLoading(true)
+        // Store role so Sidebar can read it
+        localStorage.setItem('userRole', role === 'admin' ? 'ADMIN' : 'EMPLOYEE')
         // TODO: add auth logic
         setLoading(false)
     }
