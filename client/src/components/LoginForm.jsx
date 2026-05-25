@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import LoginLeftSide from "./LoginLeftSide"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
@@ -9,6 +9,7 @@ const LoginForm = ({ role }) => {
     const [showPassword, setShowPassword] = useState(false)
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
+    const navigate = useNavigate()
 
     const title = role === "admin" ? "Admin Portal" : "Employee Portal"
     const subtitle = role === "admin"
@@ -19,10 +20,9 @@ const LoginForm = ({ role }) => {
         e.preventDefault()
         setError("")
         setLoading(true)
-        // Store role so Sidebar can read it
         localStorage.setItem('userRole', role === 'admin' ? 'ADMIN' : 'EMPLOYEE')
-        // TODO: add auth logic
         setLoading(false)
+        navigate('/dashboard')
     }
 
     return (
