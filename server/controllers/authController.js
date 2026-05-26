@@ -1,6 +1,6 @@
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
-import User from "../config/models/user.js"
+import User from "../config/models/User.js"
 
 const SALT_ROUNDS = 10
 
