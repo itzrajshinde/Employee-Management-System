@@ -12,7 +12,7 @@ export const getEmployees = async (req, res) => {
         const where = {}
         if (department) where.department = department
 
-        const employees = await Employee.find(where)
+        const employees = await Employee.find({ ...where, isDeleted: false })
             .sort({ createdAt: -1 })
             .populate("userId", "email role")
             .lean()
@@ -25,7 +25,8 @@ export const getEmployees = async (req, res) => {
 
         return res.json(result)
     } catch (error) {
-        return res.status(500).json({ error: "Failed to fetch employees" })
+        console.error("Get employees error:", error)
+        return res.status(500).json({ error: error.message || "Failed to fetch employees" })
     }
 }
 
@@ -76,7 +77,8 @@ export const createEmployee = async (req, res) => {
             user: { email: user.email, role: user.role },
         })
     } catch (error) {
-        return res.status(500).json({ error: "Failed to create employee" })
+        console.error("Create employee error:", error)
+        return res.status(500).json({ error: error.message || "Failed to create employee" })
     }
 }
 

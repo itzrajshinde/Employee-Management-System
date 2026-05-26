@@ -1,106 +1,94 @@
-import { useState } from "react"
-import { dummyPayslipData, dummyEmployeeData } from "../assets/assets"
+import { useState, useEffect } from "react"
 import { Download, Plus, X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import api from "../../api/axios"
+import { useAuth } from "../../api/context/AuthContext"
+import Loading from "../components/Loading"
+import toast from "react-hot-toast"
 
 const MONTHS = ["January","February","March","April","May","June",
                 "July","August","September","October","November","December"]
 
-const JOHN_DOE_ID = "69b411e6f8a807df391d7b13"
-
 const EMPTY_FORM = { employeeId: "", month: "", year: new Date().getFullYear(), basicSalary: "", allowances: "", deductions: "" }
 
 const Payslips = () => {
-    const role = localStorage.getItem("userRole") || "ADMIN"
-    const [payslips, setPayslips] = useState(() => {
-        // seed sessionStorage with dummy data on first load
-        const stored = sessionStorage.getItem("payslips")
-        if (!stored) {
-            sessionStorage.setItem("payslips", JSON.stringify(dummyPayslipData))
-            return dummyPayslipData
-        }
-        return JSON.parse(stored)
-    })
+    const { user } = useAuth()
+    const role = user?.role || "EMPLOYEE"
+    const navigate = useNavigate()
+
+    const [payslips, setPayslips] = useState([])
+    const [employees, setEmployees] = useState([])
+    const [employeeId, setEmployeeId] = useState(null)
+    const [loading, setLoading] = useState(true)
     const [generating, setGenerating] = useState(false)
     const [form, setForm] = useState(EMPTY_FORM)
 
-    const visiblePayslips = role === "ADMIN"
-        ? payslips
-        : payslips.filter((p) => {
-            const emp = p.employee
-            return emp?.firstName === "John" && emp?.lastName === "Doe"
-        })
+    useEffect(() => {
+        const load = async () => {
+            try {
+                if (role === "EMPLOYEE") {
+                    const profileRes = await api.get("/profile")
+                    const empId = profileRes.data.profile?._id
+                    setEmployeeId(empId)
+                    const res = await api.get(`/payslips?employeeId=${empId}`)
+                    setPayslips(res.data.payslips ?? [])
+                } else {
+                    const [payRes, empRes] = await Promise.all([
+                        api.get("/payslips"),
+                        api.get("/employees"),
+                    ])
+                    setPayslips(payRes.data.payslips ?? [])
+                    setEmployees(Array.isArray(empRes.data) ? empRes.data : [])
+                }
+            } catch {
+                toast.error("Failed to load payslips")
+            } finally {
+                setLoading(false)
+            }
+        }
+        load()
+    }, [role])
 
     const getPeriod = (p) => `${MONTHS[p.month - 1]} ${p.year}`
 
-    const navigate = useNavigate()
-
-    const handleGenerate = (e) => {
+    const handleGenerate = async (e) => {
         e.preventDefault()
-        const basic = Number(form.basicSalary)
-        const allowances = Number(form.allowances) || 0
-        const deductions = Number(form.deductions) || 0
-        const emp = dummyEmployeeData.find((e) => e._id === form.employeeId)
-        const newPayslip = {
-            _id: Date.now().toString(),
-            employeeId: form.employeeId,
-            month: Number(form.month),
-            year: Number(form.year),
-            basicSalary: basic,
-            allowances,
-            deductions,
-            netSalary: basic + allowances - deductions,
-            employee: emp || null,
+        try {
+            const { data } = await api.post("/payslips", {
+                employeeId: form.employeeId,
+                month: Number(form.month),
+                year: Number(form.year),
+                basicSalary: Number(form.basicSalary),
+                allowances: Number(form.allowances) || 0,
+                deductions: Number(form.deductions) || 0,
+            })
+            setPayslips(prev => [data.payslip, ...prev])
+            setForm(EMPTY_FORM)
+            setGenerating(false)
+            toast.success("Payslip generated")
+            navigate(`/print/payslips/${data.payslip._id}`)
+        } catch (err) {
+            toast.error(err.response?.data?.error || "Failed to generate payslip")
         }
-        const updated = [newPayslip, ...payslips]
-        setPayslips(updated)
-        sessionStorage.setItem("payslips", JSON.stringify(updated))
-        setForm(EMPTY_FORM)
-        setGenerating(false)
-        navigate(`/print/payslips/${newPayslip._id}`)
     }
 
-    const handleDownload = (p) => {
-        const emp = p.employee
-        const empName = emp ? `${emp.firstName}_${emp.lastName}` : "Employee"
-        const lines = [
-            "========== PAYSLIP ==========",
-            `Employee  : ${emp?.firstName ?? ""} ${emp?.lastName ?? ""}`,
-            `Position  : ${emp?.position ?? "—"}`,
-            `Department: ${emp?.department ?? "—"}`,
-            `Period    : ${getPeriod(p)}`,
-            "-----------------------------",
-            `Basic Salary : $${p.basicSalary.toLocaleString()}`,
-            `Allowances   : $${p.allowances.toLocaleString()}`,
-            `Deductions   : $${p.deductions.toLocaleString()}`,
-            "-----------------------------",
-            `Net Salary   : $${p.netSalary.toLocaleString()}`,
-            "=============================",
-        ]
-        const blob = new Blob([lines.join("\n")], { type: "text/plain" })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement("a")
-        a.href = url
-        a.download = `Payslip_${empName}_${getPeriod(p).replace(" ", "_")}.txt`
-        a.click()
-        URL.revokeObjectURL(url)
-    }
+    if (loading) return <Loading />
 
     return (
         <div className="animate-fade-in">
-            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-2xl font-semibold text-slate-900">Payslips</h1>
                     <p className="text-slate-500 text-sm mt-0.5">Generate and manage employee payslips</p>
                 </div>
-                <button onClick={() => setGenerating(true)}
-                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors duration-200">
-                    <Plus size={16} /> Generate Payslip
-                </button>
+                {role === "ADMIN" && (
+                    <button onClick={() => setGenerating(true)}
+                        className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2.5 rounded-lg transition-colors">
+                        <Plus size={16} /> Generate Payslip
+                    </button>
+                )}
             </div>
 
-            {/* Table */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -114,15 +102,15 @@ const Payslips = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {visiblePayslips.map((p) => {
-                                const emp = p.employee
+                            {payslips.map((p) => {
+                                const emp = p.employeeId
                                 const empName = emp ? `${emp.firstName} ${emp.lastName}` : "—"
                                 return (
                                     <tr key={p._id} className="hover:bg-slate-50 transition-colors">
                                         <td className="px-6 py-4 font-medium text-slate-800">{empName}</td>
                                         <td className="px-6 py-4 text-slate-500">{getPeriod(p)}</td>
-                                        <td className="px-6 py-4 text-slate-700">${p.basicSalary.toLocaleString()}</td>
-                                        <td className="px-6 py-4 font-semibold text-slate-900">${p.netSalary.toLocaleString()}</td>
+                                        <td className="px-6 py-4 text-slate-700">₹{p.basicSalary.toLocaleString()}</td>
+                                        <td className="px-6 py-4 font-semibold text-slate-900">₹{p.netSalary.toLocaleString()}</td>
                                         <td className="px-6 py-4">
                                             <button onClick={() => navigate(`/print/payslips/${p._id}`)}
                                                 className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 px-3 py-1.5 rounded-lg transition-colors">
@@ -132,7 +120,7 @@ const Payslips = () => {
                                     </tr>
                                 )
                             })}
-                            {visiblePayslips.length === 0 && (
+                            {payslips.length === 0 && (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-10 text-center text-slate-400">No payslips found.</td>
                                 </tr>
@@ -142,24 +130,24 @@ const Payslips = () => {
                 </div>
             </div>
 
-            {/* Generate Payslip modal — admin only */}
+            {/* Generate modal */}
             {generating && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-                        <div className="px-6 py-5 flex items-center justify-between">
-                            <h2 className="text-xl font-semibold text-slate-900">Generate Monthly Payslip</h2>
-                            <button onClick={() => setGenerating(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                        <div className="px-6 py-5 flex items-center justify-between border-b border-slate-100">
+                            <h2 className="text-xl font-semibold text-slate-900">Generate Payslip</h2>
+                            <button onClick={() => setGenerating(false)} className="text-slate-400 hover:text-slate-600">
                                 <X size={20} />
                             </button>
                         </div>
-                        <form onSubmit={handleGenerate} className="px-6 pb-6 space-y-5">
+                        <form onSubmit={handleGenerate} className="px-6 pb-6 pt-5 space-y-5">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Employee</label>
                                 <select required value={form.employeeId}
                                     onChange={(e) => setForm({ ...form, employeeId: e.target.value })}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                     <option value="">Select employee</option>
-                                    {dummyEmployeeData.map((emp) => (
+                                    {employees.map(emp => (
                                         <option key={emp._id} value={emp._id}>
                                             {emp.firstName} {emp.lastName} ({emp.position})
                                         </option>
@@ -174,7 +162,7 @@ const Payslips = () => {
                                         className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
                                         <option value="">Select month</option>
                                         {MONTHS.map((m, i) => (
-                                            <option key={m} value={i + 1}>{i + 1}</option>
+                                            <option key={m} value={i + 1}>{m}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -187,7 +175,7 @@ const Payslips = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Basic Salary</label>
-                                <input type="number" min="0" required placeholder="5000" value={form.basicSalary}
+                                <input type="number" min="0" required placeholder="50000" value={form.basicSalary}
                                     onChange={(e) => setForm({ ...form, basicSalary: e.target.value })}
                                     className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
                             </div>

@@ -1,6 +1,8 @@
-import { useState } from "react"
-import { dummyEmployeeData, DEPARTMENTS } from "../assets/assets"
+import { useState, useEffect } from "react"
+import { DEPARTMENTS } from "../assets/assets"
 import { Search, Plus, Pencil, Trash2 } from "lucide-react"
+import api from "../../api/axios"
+import toast from "react-hot-toast"
 
 const inputCls = "w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
 const labelCls = "block text-sm font-medium text-slate-700 mb-1.5"
@@ -15,10 +17,17 @@ const EMPTY_NEW = {
 const Employees = () => {
     const [search, setSearch] = useState("")
     const [department, setDepartment] = useState("All Departments")
-    const [employees, setEmployees] = useState(dummyEmployeeData)
+    const [employees, setEmployees] = useState([])
     const [editingEmp, setEditingEmp] = useState(null)
     const [addingEmp, setAddingEmp] = useState(false)
     const [newEmp, setNewEmp] = useState(EMPTY_NEW)
+
+    // Load employees from API
+    useEffect(() => {
+        api.get("/employees")
+            .then((res) => setEmployees(Array.isArray(res.data) ? res.data : []))
+            .catch((err) => toast.error(err.response?.data?.error || "Failed to load employees"))
+    }, [])
 
     const filtered = employees.filter((emp) => {
         const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
@@ -28,31 +37,44 @@ const Employees = () => {
         return matchesSearch && matchesDept
     })
 
-    const handleDelete = (emp) => {
-        if (window.confirm("Are you sure you want to delete this employee?")) {
+    const handleDelete = async (emp) => {
+        if (!window.confirm("Are you sure you want to delete this employee?")) return
+        try {
+            await api.delete(`/employees/${emp._id}`)
             setEmployees((prev) => prev.filter((e) => e._id !== emp._id))
+            toast.success("Employee deleted")
+        } catch {
+            toast.error("Failed to delete employee")
         }
     }
 
-    const handleAddSave = (e) => {
+    const handleAddSave = async (e) => {
         e.preventDefault()
-        const created = {
-            ...newEmp,
-            _id: Date.now().toString(),
-            employmentStatus: "ACTIVE",
-            joinDate: new Date().toISOString(),
-            image: null,
-            basicSalary: Number(newEmp.basicSalary) || 0,
+        try {
+            const { data } = await api.post("/employees", {
+                ...newEmp,
+                email: newEmp.email || newEmp.workEmail,
+                basicSalary: Number(newEmp.basicSalary) || 0,
+            })
+            setEmployees((prev) => [data.employee, ...prev])
+            setNewEmp(EMPTY_NEW)
+            setAddingEmp(false)
+            toast.success("Employee added successfully")
+        } catch (err) {
+            toast.error(err.response?.data?.error || "Failed to add employee")
         }
-        setEmployees((prev) => [created, ...prev])
-        setNewEmp(EMPTY_NEW)
-        setAddingEmp(false)
     }
 
-    const handleEditSave = (e) => {
+    const handleEditSave = async (e) => {
         e.preventDefault()
-        setEmployees((prev) => prev.map((emp) => emp._id === editingEmp._id ? editingEmp : emp))
-        setEditingEmp(null)
+        try {
+            const { data } = await api.put(`/employees/${editingEmp._id}`, editingEmp)
+            setEmployees((prev) => prev.map((emp) => emp._id === data._id ? data : emp))
+            setEditingEmp(null)
+            toast.success("Employee updated")
+        } catch {
+            toast.error("Failed to update employee")
+        }
     }
 
     return (
@@ -78,8 +100,8 @@ const Employees = () => {
                 </div>
                 <select value={department} onChange={(e) => setDepartment(e.target.value)}
                     className="px-4 py-2.5 rounded-lg border border-slate-200 bg-white text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400 transition">
-                    <option>All Departments</option>
-                    {DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}
+                    <option value="All Departments">All Departments</option>
+                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
             </div>
 
@@ -236,6 +258,13 @@ const Employees = () => {
                                 <label className={labelCls}>Phone</label>
                                 <input type="tel" value={newEmp.phone}
                                     onChange={(e) => setNewEmp({ ...newEmp, phone: e.target.value })}
+                                    className={inputCls} />
+                            </div>
+                            <div>
+                                <label className={labelCls}>Personal Email</label>
+                                <input type="email" value={newEmp.email}
+                                    onChange={(e) => setNewEmp({ ...newEmp, email: e.target.value })}
+                                    placeholder="personal@email.com"
                                     className={inputCls} />
                             </div>
 
