@@ -1,5 +1,5 @@
 import Employee from "../config/models/Employee.js"
-import User from "../config/models/user.js"
+import User from "../config/models/User.js"
 
 // GET /api/profile
 export const getProfile = async (req, res) => {

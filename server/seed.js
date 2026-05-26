@@ -1,7 +1,7 @@
 import "dotenv/config"
 import bcrypt from "bcrypt"
 import connectDB from "./config/db.js"
-import User from "./config/models/user.js"
+import User from "./config/models/User.js"
 
 const TemporaryPassword = "admin123"
 
