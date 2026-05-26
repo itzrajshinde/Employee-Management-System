@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { dummyProfileData } from '../assets/assets'
+import { useAuth } from '../../api/context/AuthContext'
+import api from '../../api/axios'
 import {
     User as UserIcon,
     X as XIcon,
@@ -34,21 +35,29 @@ const employeeNavItems = [
 const Sidebar = () => {
     const { pathname } = useLocation()
     const navigate = useNavigate()
+    const { user, logout } = useAuth()
     const [userName, setUserName] = useState('')
     const [mobileOpen, setMobileOpen] = useState(false)
 
+    const role = user?.role || 'EMPLOYEE'
+    const navItems = role === 'ADMIN' ? adminNavItems : employeeNavItems
+
     const handleLogout = () => {
-        localStorage.removeItem('userRole')
+        logout()
         navigate('/login')
     }
 
-    // Read role set during login
-    const role = localStorage.getItem('userRole') || 'EMPLOYEE'
-    const navItems = role === 'EMPLOYEE' ? adminNavItems : employeeNavItems
-
     useEffect(() => {
-        setUserName(dummyProfileData.firstName + ' ' + dummyProfileData.lastName)
-    }, [])
+        api.get('/profile')
+            .then((res) => {
+                const profile = res.data.profile
+                const name = profile.firstName
+                    ? `${profile.firstName} ${profile.lastName}`
+                    : profile.email
+                setUserName(name)
+            })
+            .catch(() => setUserName(user?.email || ''))
+    }, [user])
 
     useEffect(() => {
         setMobileOpen(false)

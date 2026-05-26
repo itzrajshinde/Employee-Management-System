@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom"
 import LoginLeftSide from "./LoginLeftSide"
 import { ArrowLeft, Eye, EyeOff } from "lucide-react"
 import { useState } from "react"
+import { useAuth } from "../../api/context/AuthContext"
+import api from "../../api/axios"
 
 const LoginForm = ({ role }) => {
     const [email, setEmail] = useState("")
@@ -10,6 +12,7 @@ const LoginForm = ({ role }) => {
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
+    const { login } = useAuth()
 
     const title = role === "admin" ? "Admin Portal" : "Employee Portal"
     const subtitle = role === "admin"
@@ -20,9 +23,15 @@ const LoginForm = ({ role }) => {
         e.preventDefault()
         setError("")
         setLoading(true)
-        localStorage.setItem('userRole', role === 'admin' ? 'ADMIN' : 'EMPLOYEE')
-        setLoading(false)
-        navigate('/dashboard')
+        try {
+            const { data } = await api.post("/auth/login", { email, password, role_type: role })
+            login(data.user, data.token)
+            navigate("/dashboard")
+        } catch (err) {
+            setError(err.response?.data?.error || "Invalid credentials")
+        } finally {
+            setLoading(false)
+        }
     }
 
     return (

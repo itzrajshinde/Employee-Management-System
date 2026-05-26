@@ -10,6 +10,13 @@ import Payslips from "./pages/payslips"
 import Settings from "./pages/settings"
 import PrintPayslips from "./pages/printpayslips"
 import Layouts from "./pages/layouts"
+import { useAuth } from "../api/context/AuthContext"
+
+// Redirect to login if not authenticated
+const ProtectedRoute = ({ children }) => {
+  const { user } = useAuth()
+  return user ? children : <Navigate to="/login" replace />
+}
 
 const App = () => {
   return (
@@ -17,9 +24,9 @@ const App = () => {
       <Toaster />
       <Routes>
         <Route path="/login" element={<LoginLanding />} />
-        <Route path="/login/admin" element={ <LoginForm role="admin" title="Admin Portal" subtitle="Sign in to manage the organization"/> }/>
-        <Route path="/login/employee" element={<LoginForm role="employee" title="Employee Portal" subtitle="Sign in to manage access your account"/>} />
-        <Route element={<Layouts />}>
+        <Route path="/login/admin" element={<LoginForm role="admin" />} />
+        <Route path="/login/employee" element={<LoginForm role="employee" />} />
+        <Route element={<ProtectedRoute><Layouts /></ProtectedRoute>}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/employees" element={<Employees />} />
           <Route path="/attendance" element={<Attendance />} />
