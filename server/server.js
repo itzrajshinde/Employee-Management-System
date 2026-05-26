@@ -7,6 +7,15 @@ import authRouter from "./Routes/authRoutes.js"
 import employeesRouter from "./Routes/employeeRoute.js"
 import profileRouter from "./Routes/profileRoute.js"
 import attendanceRouter from "./Routes/attendanceRoutes.js"
+import leaveRouter from "./Routes/leaveRoutes.js"
+import payslipRouter from "./Routes/payslipRoutes.js"
+import dashboardRouter from "./Routes/dashboardRoutes.js"
+
+import { serve } from "inngest/express";
+import { inngest, functions } from "./inngest/index.js"
+
+
+
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -22,6 +31,11 @@ app.use("/api/auth", authRouter)
 app.use("/api/employees", employeesRouter)
 app.use("/api/profile", profileRouter)
 app.use("/api/attendance", attendanceRouter)
+app.use("/api/leaves", leaveRouter)
+app.use("/api/payslips", payslipRouter)
+app.use("/api/dashboard", dashboardRouter)
+
+app.use("/api/inngest", serve({ client: inngest, functions }));
 
 // Connect DB then start server
 const start = async () => {
